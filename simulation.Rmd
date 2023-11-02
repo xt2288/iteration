@@ -1,0 +1,164 @@
+---
+title: "simulation"
+author: "Xiaoting Tang"
+date: "`r Sys.Date()`"
+output: github_document
+---
+
+```{r}
+library(tidyverse)
+library(rvest)
+set.seed(12345)
+```
+
+## Simulate sample mean and sd
+
+```{r}
+sim_mean_sd = function(n, mu = 2, sigma = 3) {
+  
+  sim_data = tibble(
+    x = rnorm(n, mean = mu, sd = sigma),
+  )
+  
+  sim_data |> 
+    summarize(
+      mu_hat = mean(x),
+      sigma_hat = sd(x)
+    )
+}
+```
+
+Let's see what this does
+
+```{r}
+sim_mean_sd(n = 30)
+```
+
+Let's iterate to see how this works UNDER REPEATED SAMPLING!!!
+
+```{r}
+ouput = vector("list", length = 100)
+
+for (i in 1:100) {
+  output[[i]] = sim_mean_sd(n = 30)
+}
+
+sim_results = bind_rows(output)
+
+sim_results |>
+  ggplot(aes(x = mean)) + geom_density()
+
+sim_results |>
+  summarise(
+    mu_hat = mean(mean),
+    sd_hat = sd(mean)
+  )
+```
+
+use a map function
+
+```{r}
+sim_result_df = 
+  expand_grid(
+    sample_size = 30,
+    iter = 1:100
+  ) |>
+  mutate(estimate_df = map(sample_size, sim_mean_sd)) |>
+  unnest(estimate_df)
+```
+
+
+```{r}
+sim_result_df = 
+  expand_grid(
+    sample_size = c(30, 60, 120, 240),
+    iter = 1:100
+  ) |>
+  mutate(estimate_df = map(sample_size, sim_mean_sd)) |>
+  unnest(estimate_df)
+
+sim_result_df |>
+  mutate(sample_size = str_c("n = ", sample_size),
+         sample_size = fct_inorder(sample_size)) |>
+  ggplot(aes(x = sample_size, y = mean)) +
+  geom_boxplot()
+```
+
+
+
+```{r}
+sim_mean_sd = function(n, true_p = 0.9) {
+  
+  sim_data = tibble(
+    x = rbinom(n, size= 1, prob = true_p),
+  )
+  
+  sim_data |> 
+    summarize(
+      mu_hat = mean(x),
+      sigma_hat = sd(x)
+    )
+}
+```
+
+
+## SLR
+
+Goal is to write a function that simulates data and then fits a regression; then repeat to look at the distribution of estimated coefficients.
+
+```{r}
+sim_slr = function(n_obs, beta_0 = 2, beta_1 = 3){
+  
+  sim_data = 
+    tibble(
+      x = rnorm(n = n_obs, mean = 1, sd = 1),
+      y = beta_0 + beta_1 * x + rnorm(n_obs, mean = 0, sd = 1)
+  )
+  ls_fit = lm(y ~ x, data = sim_data)
+  
+  tibble(
+    beta0_hat = coef(ls_fit)[1],
+    beta1_hat = coef(ls_fit)[2]
+  )
+}
+
+sim_slr(n_obs = 30)
+```
+
+run this a whole brunch of times
+
+```{r}
+sim_results_df = 
+  expand_grid(
+    sample_size = 30,
+    iter = 1: 1000
+  ) |>
+  mutate(estimate_df = map(sample_size, sim_slr)) |>
+  unnest(estimate_df)
+```
+
+let's look at results
+
+```{r}
+sim_results_df |>
+  summarize(
+    mean_b0_hat = mean(beta0_hat),
+    mean_b1_hat = mean(beta1_hat)
+  )
+
+sim_results_df |>
+  ggplot(aes(x = beta0_hat)) +
+  geom_histogram()
+
+sim_results_df |>
+  ggplot(aes(x = beta0_hat, y = beta1_hat)) +
+  geom_point()
+
+```
+
+
+
+
+
+
+
